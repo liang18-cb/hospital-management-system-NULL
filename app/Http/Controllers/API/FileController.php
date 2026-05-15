@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\API;
 
-use App\Models\Doctor;
+use App\Models\File;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 
-class DoctorController extends Controller
+class FileController extends Controller
 {
     /**
      * Display a listing of the resource.
@@ -35,7 +35,7 @@ class DoctorController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(Doctor $doctor)
+    public function show(File $file)
     {
         //
     }
@@ -43,7 +43,7 @@ class DoctorController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(Doctor $doctor)
+    public function edit(File $file)
     {
         //
     }
@@ -51,7 +51,7 @@ class DoctorController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Doctor $doctor)
+    public function update(Request $request, File $file)
     {
         //
     }
@@ -59,7 +59,7 @@ class DoctorController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Doctor $doctor)
+    public function destroy(File $file)
     {
         //
     }

@@ -8,27 +8,37 @@ use Illuminate\Http\Request;
 
 class AppointmentController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $appointments = Appointment::all();
+        $user = $request->user();
+        $query = Appointment::query();
+
+        if ($user->isDoctor()) {
+            $query->where('doctor_id', $user->doctor->id);
+        } elseif ($user->isPatient()) {
+            $query->where('patient_id', $user->patient->id);
+        }
 
         return response()->json([
             'status' => 'success',
             'message' => 'Data janji temu berhasil diambil',
-            'data' => $appointments
+            'data' => $query->get()
         ], 200);
     }
 
     public function store(Request $request)
     {
+        $user = $request->user();
+
         $validated = $request->validate([
-            'patient_id' => 'required|integer',
-            'doctor_id' => 'required|integer',
-            'schedule_id' => 'required|integer',
+            'doctor_id' => 'required|integer|exists:doctors,id',
+            'schedule_id' => 'required|integer|exists:schedules,id',
             'appointment_date' => 'required|date',
-            'status' => 'required|in:pending,confirmed,completed,cancelled',
             'complaint' => 'nullable|string',
         ]);
+
+        $validated['patient_id'] = $user->patient->id;
+        $validated['status'] = 'pending';
 
         $appointment = Appointment::create($validated);
 
@@ -39,8 +49,18 @@ class AppointmentController extends Controller
         ], 201);
     }
 
-    public function show(Appointment $appointment)
+    public function show(Request $request, Appointment $appointment)
     {
+        $user = $request->user();
+
+        if ($user->isDoctor() && $appointment->doctor_id !== $user->doctor->id) {
+            return response()->json(['message' => 'Unauthorized access.'], 403);
+        }
+
+        if ($user->isPatient() && $appointment->patient_id !== $user->patient->id) {
+            return response()->json(['message' => 'Unauthorized access.'], 403);
+        }
+
         return response()->json([
             'status' => 'success',
             'message' => 'Detail janji temu berhasil ditemukan',
@@ -51,9 +71,9 @@ class AppointmentController extends Controller
     public function update(Request $request, Appointment $appointment)
     {
         $validated = $request->validate([
-            'patient_id' => 'sometimes|integer',
-            'doctor_id' => 'sometimes|integer',
-            'schedule_id' => 'sometimes|integer',
+            'patient_id' => 'sometimes|integer|exists:patients,id',
+            'doctor_id' => 'sometimes|integer|exists:doctors,id',
+            'schedule_id' => 'sometimes|integer|exists:schedules,id',
             'appointment_date' => 'sometimes|date',
             'status' => 'sometimes|in:pending,confirmed,completed,cancelled',
             'complaint' => 'nullable|string',

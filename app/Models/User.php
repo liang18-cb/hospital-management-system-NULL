@@ -5,40 +5,24 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens; // Wajib untuk API Authentication [cite: 43]
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'name',
         'email',
         'password',
-        'role', // Wajib ditambahkan agar role bisa diisi 
+        'role',
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var array<int, string>
-     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
@@ -47,19 +31,43 @@ class User extends Authenticatable
         ];
     }
 
-    /**
-     * Relasi ke profil Dokter
-     */
-    public function doctor()
+    public function isAdmin(): bool
     {
-        return $this->hasOne(Doctor::class); // 
+        return $this->role === 'admin';
     }
 
-    /**
-     * Relasi ke profil Pasien
-     */
+    public function isDoctor(): bool
+    {
+        return $this->role === 'doctor';
+    }
+
+    public function isPatient(): bool
+    {
+        return $this->role === 'patient';
+    }
+
+    public function doctor()
+    {
+        return $this->hasOne(Doctor::class);
+    }
+
     public function patient()
     {
-        return $this->hasOne(Patient::class); // 
+        return $this->hasOne(Patient::class);
+    }
+
+    public function notifications()
+    {
+        return $this->hasMany(Notification::class);
+    }
+
+    public function appointmentsAsDoctor()
+    {
+        return $this->hasManyThrough(Appointment::class, Doctor::class, 'user_id', 'doctor_id');
+    }
+
+    public function appointmentsAsPatient()
+    {
+        return $this->hasManyThrough(Appointment::class, Patient::class, 'user_id', 'patient_id');
     }
 }

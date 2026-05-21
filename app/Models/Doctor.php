@@ -40,4 +40,9 @@ class Doctor extends Model
     {
         return $this->morphMany(File::class, 'fileable');
     }
+
+    public function patients()
+    {
+        return $this->belongsToMany(Patient::class, 'appointments', 'doctor_id', 'patient_id')->withTimestamps();
+    }
 }

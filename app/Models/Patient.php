@@ -31,4 +31,9 @@ class Patient extends Model
     {
         return $this->morphMany(File::class, 'fileable');
     }
+
+    public function doctors()
+    {
+        return $this->belongsToMany(Doctor::class, 'appointments', 'patient_id', 'doctor_id')->withTimestamps();
+    }
 }

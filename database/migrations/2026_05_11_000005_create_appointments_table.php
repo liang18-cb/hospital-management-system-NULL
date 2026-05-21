@@ -10,9 +10,9 @@ return new class extends Migration
     {
         Schema::create('appointments', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('patient_id')->constrained('patients')->onDelete('cascade');
-            $table->foreignId('doctor_id')->constrained('doctors')->onDelete('cascade');
-            $table->foreignId('schedule_id')->constrained('schedules')->onDelete('cascade');
+            $table->foreignId('patient_id')->constrained('patients')->onDelete('restrict');
+            $table->foreignId('doctor_id')->constrained('doctors')->onDelete('restrict');
+            $table->foreignId('schedule_id')->constrained('schedules')->onDelete('restrict');
             $table->date('appointment_date');
             $table->enum('status', ['pending', 'confirmed', 'completed', 'cancelled'])->default('pending');
             $table->text('complaint');

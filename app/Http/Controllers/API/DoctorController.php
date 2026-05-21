@@ -4,124 +4,100 @@ namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
 use App\Models\Doctor;
-use App\Models\User;
-use App\Http\Resources\API\DoctorResource;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 
 class DoctorController extends Controller
 {
-    /**
-     * Menampilkan semua dokter
-     */
     public function index()
     {
-        $doctors = Doctor::with('user')->get();
-
-        return DoctorResource::collection($doctors);
-    }
-
-    /**
-     * Menampilkan satu dokter
-     */
-    public function show($id)
-    {
-        $doctor = Doctor::with('user')->find($id);
-
-        if (!$doctor) {
-            return response()->json([
-                'message' => 'Dokter tidak ditemukan'
-            ], 404);
-        }
-
-        return new DoctorResource($doctor);
-    }
-
-    /**
-     * Menambahkan dokter baru
-     */
-   public function store(Request $request)
-{
-    $validated = $request->validate([
-        'name' => 'required|string|max:255',
-        'email' => 'required|email|unique:users,email',
-        'password' => 'required|min:6',
-        'specialization' => 'required|string',
-        'phone' => 'required|string',
-        'address' => 'required|string',
-    ]);
-
-    // Buat user
-    $user = User::create([
-        'name' => $validated['name'],
-        'email' => $validated['email'],
-        'password' => Hash::make($validated['password']),
-        'role' => 'doctor',
-    ]);
-
-    // Buat doctor
-    $doctor = Doctor::create([
-        'user_id' => $user->id,
-        'specialization' => $validated['specialization'],
-        'phone' => $validated['phone'],
-        'address' => $validated['address'],
-    ]);
-
-    return response()->json([
-        'success' => true,
-        'message' => 'Doctor berhasil dibuat',
-        'data' => new DoctorResource($doctor->load('user'))
-    ], 201);
-}
-
-    /**
-     * Update dokter
-     */
-    public function update(Request $request, $id)
-    {
-        $doctor = Doctor::with('user')->find($id);
-
-        if (!$doctor) {
-            return response()->json([
-                'message' => 'Dokter tidak ditemukan'
-            ], 404);
-        }
-
-        $validated = $request->validate([
-            'specialization' => 'required|string',
-            'phone' => 'required|string',
-        ]);
-
-        $doctor->update([
-            'specialization' => $validated['specialization'],
-            'phone' => $validated['phone'],
-        ]);
+        $doctors = Doctor::all();
 
         return response()->json([
-            'success' => true,
-            'message' => 'Doctor berhasil diupdate',
-            'data' => new DoctorResource($doctor->load('user'))
-        ]);
+            'status' => 'success',
+            'message' => 'Data dokter berhasil diambil',
+            'data' => $doctors
+        ], 200);
     }
 
-    /**
-     * Hapus dokter
-     */
-    public function destroy($id)
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'specialization' => 'required|string|max:255',
+            'phone' => 'required|string|max:20',
+            'email' => 'required|email|unique:doctors,email',
+        ]);
+
+        $doctor = Doctor::create($validated);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Data dokter berhasil ditambahkan',
+            'data' => $doctor
+        ], 201);
+    }
+
+    public function show(int $id)
     {
         $doctor = Doctor::find($id);
 
         if (!$doctor) {
             return response()->json([
-                'message' => 'Dokter tidak ditemukan'
+                'status' => 'error',
+                'message' => 'Data dokter tidak ditemukan'
+            ], 404);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Detail dokter berhasil ditemukan',
+            'data' => $doctor
+        ], 200);
+    }
+
+    public function update(Request $request, int $id)
+    {
+        $doctor = Doctor::find($id);
+
+        if (!$doctor) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Data dokter tidak ditemukan'
+            ], 404);
+        }
+
+        $validated = $request->validate([
+            'name' => 'sometimes|string|max:255',
+            'specialization' => 'sometimes|string|max:255',
+            'phone' => 'sometimes|string|max:20',
+            'email' => 'sometimes|email|unique:doctors,email,' . $id,
+        ]);
+
+        $doctor->update($validated);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Data dokter berhasil diperbarui',
+            'data' => $doctor
+        ], 200);
+    }
+
+    public function destroy(int $id)
+    {
+        $doctor = Doctor::find($id);
+
+        if (!$doctor) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Data dokter tidak ditemukan'
             ], 404);
         }
 
         $doctor->delete();
 
         return response()->json([
-            'success' => true,
-            'message' => 'Doctor berhasil dihapus'
-        ]);
+            'status' => 'success',
+            'message' => 'Data dokter berhasil dihapus'
+        ], 200);
     }
 }

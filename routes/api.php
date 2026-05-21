@@ -22,21 +22,48 @@ Route::prefix('v1')->group(function () {
             return $request->user();
         });
 
-        Route::get('/doctors', [DoctorController::class, 'index']);
-        Route::get('/doctors/{id}', [DoctorController::class, 'show']);
-        Route::post('/doctors', [DoctorController::class, 'store']);
-        Route::put('/doctors/{id}', [DoctorController::class, 'update']);
-        Route::delete('/doctors/{id}', [DoctorController::class, 'destroy']);
+        Route::middleware('role:admin')->group(function () {
+            Route::apiResource('doctors', DoctorController::class);
+            Route::apiResource('patients', PatientController::class);
+        });
 
-        Route::get('/patients', [PatientController::class, 'index']);
-        Route::get('/patients/{id}', [PatientController::class, 'show']);
-        Route::post('/patients', [PatientController::class, 'store']);
-        Route::put('/patients/{id}', [PatientController::class, 'update']);
-        Route::delete('/patients/{id}', [PatientController::class, 'destroy']);
+        Route::middleware('role:admin,doctor,patient')->group(function () {
+            Route::get('/appointments', [AppointmentController::class, 'index']);
+            Route::get('/appointments/{appointment}', [AppointmentController::class, 'show']);
+        });
 
-        Route::apiResource('appointments', AppointmentController::class);
-        Route::apiResource('medical-records', MedicalRecordController::class);
-        Route::apiResource('files', FileController::class);
+        Route::middleware('role:patient')->group(function () {
+            Route::post('/appointments', [AppointmentController::class, 'store']);
+        });
+
+        Route::middleware('role:admin')->group(function () {
+            Route::put('/appointments/{appointment}', [AppointmentController::class, 'update']);
+            Route::delete('/appointments/{appointment}', [AppointmentController::class, 'destroy']);
+        });
+
+        Route::middleware('role:admin,doctor,patient')->group(function () {
+            Route::get('/medical-records', [MedicalRecordController::class, 'index']);
+            Route::get('/medical-records/{medical_record}', [MedicalRecordController::class, 'show']);
+        });
+
+        Route::middleware('role:doctor')->group(function () {
+            Route::post('/medical-records', [MedicalRecordController::class, 'store']);
+        });
+
+        Route::middleware('role:admin')->group(function () {
+            Route::put('/medical-records/{medical_record}', [MedicalRecordController::class, 'update']);
+            Route::delete('/medical-records/{medical_record}', [MedicalRecordController::class, 'destroy']);
+        });
+
+        Route::middleware('role:admin')->group(function () {
+            Route::get('/files', [FileController::class, 'index']);
+            Route::delete('/files/{file}', [FileController::class, 'destroy']);
+        });
+
+        Route::middleware('role:doctor,patient')->group(function () {
+            Route::post('/files', [FileController::class, 'store']);
+            Route::get('/files/{file}', [FileController::class, 'show']);
+        });
 
     });
 });

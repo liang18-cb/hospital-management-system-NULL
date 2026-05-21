@@ -6,13 +6,13 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-class RoleMiddleware
+class EnsureEmailVerified
 {
-    public function handle(Request $request, Closure $next, string ...$roles): Response
+    public function handle(Request $request, Closure $next): Response
     {
-        if (!$request->user() || !in_array($request->user()->role, $roles)) {
+        if (!$request->user() || !$request->user()->email_verified_at) {
             return response()->json([
-                'message' => 'Unauthorized access.'
+                'message' => 'Your email address is not verified.'
             ], 403);
         }
 

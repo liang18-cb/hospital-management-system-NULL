@@ -14,6 +14,8 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,
+            'verified.email' => \App\Http\Middleware\EnsureEmailVerified::class,
+            'token.invalidate' => \App\Http\Middleware\InvalidateTokenOnLogout::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

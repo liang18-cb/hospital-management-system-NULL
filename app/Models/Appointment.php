@@ -30,7 +30,7 @@ class Appointment extends Model
 
     public function schedule()
     {
-        return $this->belongsTo(\App\Models\Schedule::class);
+        return $this->belongsTo(Schedule::class);
     }
 
     public function medicalRecord()

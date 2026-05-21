@@ -5,30 +5,26 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class MedicalRecord extends Model
+class Schedule extends Model
 {
     use HasFactory;
 
-    protected $fillable = [
-        'appointment_id',
-        'doctor_id',
-        'diagnosis',
-        'prescription',
-        'notes',
-    ];
+    protected $table = 'schedules';
 
-    public function appointment()
-    {
-        return $this->belongsTo(Appointment::class);
-    }
+    protected $fillable = [
+        'doctor_id',
+        'day_of_week',
+        'start_time',
+        'end_time',
+    ];
 
     public function doctor()
     {
         return $this->belongsTo(Doctor::class);
     }
 
-    public function files()
+    public function appointments()
     {
-        return $this->morphMany(File::class, 'fileable');
+        return $this->hasMany(Appointment::class);
     }
 }

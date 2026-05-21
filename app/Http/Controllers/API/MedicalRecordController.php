@@ -8,59 +8,71 @@ use Illuminate\Http\Request;
 
 class MedicalRecordController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
     public function index()
     {
-        //
+        $medicalRecords = MedicalRecord::all();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Data rekam medis berhasil diambil',
+            'data' => $medicalRecords
+        ], 200);
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        //
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
-        //
+        $validated = $request->validate([
+            'appointment_id' => 'required|integer',
+            'doctor_id' => 'required|integer',
+            'diagnosis' => 'required|string',
+            'prescription' => 'required|string',
+            'notes' => 'nullable|string'
+        ]);
+
+        $medicalRecord = MedicalRecord::create($validated);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Rekam medis baru berhasil ditambahkan',
+            'data' => $medicalRecord
+        ], 201);
     }
 
-    /**
-     * Display the specified resource.
-     */
     public function show(MedicalRecord $medicalRecord)
     {
-        //
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Detail rekam medis berhasil ditemukan',
+            'data' => $medicalRecord
+        ], 200);
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(MedicalRecord $medicalRecord)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(Request $request, MedicalRecord $medicalRecord)
     {
-        //
+        $validated = $request->validate([
+            'appointment_id' => 'sometimes|integer',
+            'doctor_id' => 'sometimes|integer',
+            'diagnosis' => 'sometimes|string',
+            'prescription' => 'sometimes|string',
+            'notes' => 'nullable|string'
+        ]);
+
+        $medicalRecord->update($validated);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Data rekam medis berhasil diperbarui',
+            'data' => $medicalRecord
+        ], 200);
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(MedicalRecord $medicalRecord)
     {
-        //
+        $medicalRecord->delete();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Data rekam medis berhasil dihapus'
+        ], 200);
     }
 }

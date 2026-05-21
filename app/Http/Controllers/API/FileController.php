@@ -5,62 +5,96 @@ namespace App\Http\Controllers\API;
 use App\Models\File;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Auth;
 
 class FileController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
     public function index()
     {
-        //
+        $files = File::all();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Data file berhasil diambil',
+            'data' => $files
+        ], 200);
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        //
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
-        //
+        $request->validate([
+            'fileable_type' => 'required|string',
+            'fileable_id' => 'required|integer',
+            'document' => 'required|file|max:2048'
+        ]);
+
+        if ($request->hasFile('document')) {
+            $uploadedFile = $request->file('document');
+            $originalName = $uploadedFile->getClientOriginalName();
+            $mimeType = $uploadedFile->getClientMimeType();
+            $size = $uploadedFile->getSize();
+            
+            $filePath = $uploadedFile->store('uploads', 'public');
+
+            $file = File::create([
+                'fileable_type' => $request->fileable_type,
+                'fileable_id' => $request->fileable_id,
+                'file_path' => $filePath,
+                'original_name' => $originalName,
+                'mime_type' => $mimeType,
+                'size' => $size,
+                'uploaded_by' => Auth::user() ? Auth::user()->id : null
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'File berhasil diunggah',
+                'data' => $file
+            ], 201);
+        }
+
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Gagal mengunggah file'
+        ], 400);
     }
 
-    /**
-     * Display the specified resource.
-     */
     public function show(File $file)
     {
-        //
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Detail info file berhasil ditemukan',
+            'data' => $file
+        ], 200);
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(File $file)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(Request $request, File $file)
     {
-        //
+        $request->validate([
+            'original_name' => 'sometimes|string'
+        ]);
+
+        $file->update($request->only('original_name'));
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Nama file berhasil diperbarui',
+            'data' => $file
+        ], 200);
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(File $file)
     {
-        //
+        if (Storage::disk('public')->exists($file->file_path)) {
+            Storage::disk('public')->delete($file->file_path);
+        }
+
+        $file->delete();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Data file berhasil dihapus'
+        ], 200);
     }
 }

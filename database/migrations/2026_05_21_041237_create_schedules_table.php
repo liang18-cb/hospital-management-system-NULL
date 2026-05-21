@@ -8,19 +8,17 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('medical_records', function (Blueprint $table) {
+        Schema::create('schedules', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('appointment_id')->constrained('appointments')->onDelete('cascade');
-            $table->text('diagnosis');
-            $table->text('prescription');
-            $table->text('notes')->nullable();
             $table->foreignId('doctor_id')->constrained('doctors')->onDelete('cascade');
-            $table->timestamps();
+            $table->string('day_of_week');
+            $table->time('start_time');
+            $table->time('end_time');
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('medical_records');
+        Schema::dropIfExists('schedules');
     }
 };

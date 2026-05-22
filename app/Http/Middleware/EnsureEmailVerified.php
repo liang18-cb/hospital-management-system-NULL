@@ -12,7 +12,11 @@ class EnsureEmailVerified
     {
         if (!$request->user() || !$request->user()->email_verified_at) {
             return response()->json([
-                'message' => 'Your email address is not verified.'
+                'status' => 'error',
+                'message' => 'Alamat email Anda belum diverifikasi.',
+                'data' => null,
+                'meta' => null,
+                'errors' => null
             ], 403);
         }
 

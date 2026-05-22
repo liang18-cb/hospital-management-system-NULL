@@ -1,8 +1,16 @@
 <?php
 
-use Illuminate\Foundation\Inspiring;
-use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 
-Artisan::command('inspire', function () {
-    $this->comment(Inspiring::quote());
-})->purpose('Display an inspiring quote');
+Schedule::call(function () {
+    $files = DB::table('files')->whereNotNull('deleted_at')->get();
+
+    foreach ($files as $file) {
+        if (Storage::exists($file->file_path)) {
+            Storage::delete($file->file_path);
+        }
+        DB::table('files')->where('id', $file->id)->delete();
+    }
+})->daily();

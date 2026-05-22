@@ -4,100 +4,123 @@ namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
 use App\Models\Doctor;
-use Illuminate\Http\Request;
+use App\Models\User;
+use App\Http\Requests\StoreDoctorRequest;
+use App\Http\Requests\UpdateDoctorRequest;
+use App\Http\Resources\API\DoctorResource;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Exception;
 
 class DoctorController extends Controller
 {
-    public function index()
+    public function index(): JsonResponse
     {
-        $doctors = Doctor::all();
+        $doctors = Doctor::with('user')->paginate(10);
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Data dokter berhasil diambil',
-            'data' => $doctors
-        ], 200);
+        return $this->sendResponse(
+            DoctorResource::collection($doctors),
+            'Data dokter berhasil diambil'
+        );
     }
 
-    public function store(Request $request)
+    public function store(StoreDoctorRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'specialization' => 'required|string|max:255',
-            'phone' => 'required|string|max:20',
-            'email' => 'required|email|unique:doctors,email',
-        ]);
+        $validated = $request->validated();
 
-        $doctor = Doctor::create($validated);
+        DB::beginTransaction();
+        try {
+            $user = User::create([
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'password' => Hash::make($validated['password']),
+                'role' => 'doctor',
+            ]);
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Data dokter berhasil ditambahkan',
-            'data' => $doctor
-        ], 201);
-    }
+            $doctor = Doctor::create([
+                'user_id' => $user->id,
+                'specialization' => $validated['specialization'],
+                'phone' => $validated['phone'],
+            ]);
 
-    public function show(int $id)
-    {
-        $doctor = Doctor::find($id);
+            DB::commit();
 
-        if (!$doctor) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Data dokter tidak ditemukan'
-            ], 404);
+            return $this->sendResponse(
+                new DoctorResource($doctor->load('user')),
+                'Data dokter berhasil ditambahkan',
+                201
+            );
+        } catch (Exception $e) {
+            DB::rollBack();
+            throw $e;
         }
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Detail dokter berhasil ditemukan',
-            'data' => $doctor
-        ], 200);
     }
 
-    public function update(Request $request, int $id)
+    public function show(string|int $id): JsonResponse
     {
-        $doctor = Doctor::find($id);
+        $doctor = Doctor::with('user')->findOrFail($id);
 
-        if (!$doctor) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Data dokter tidak ditemukan'
-            ], 404);
-        }
-
-        $validated = $request->validate([
-            'name' => 'sometimes|string|max:255',
-            'specialization' => 'sometimes|string|max:255',
-            'phone' => 'sometimes|string|max:20',
-            'email' => 'sometimes|email|unique:doctors,email,' . $id,
-        ]);
-
-        $doctor->update($validated);
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Data dokter berhasil diperbarui',
-            'data' => $doctor
-        ], 200);
+        return $this->sendResponse(
+            new DoctorResource($doctor),
+            'Detail dokter berhasil ditemukan'
+        );
     }
 
-    public function destroy(int $id)
+    public function update(UpdateDoctorRequest $request, string|int $id): JsonResponse
     {
-        $doctor = Doctor::find($id);
+        $doctor = Doctor::with('user')->findOrFail($id);
+        $validated = $request->validated();
 
-        if (!$doctor) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Data dokter tidak ditemukan'
-            ], 404);
+        DB::beginTransaction();
+        try {
+            $userFields = [];
+            if (isset($validated['name'])) $userFields['name'] = $validated['name'];
+            if (isset($validated['email'])) $userFields['email'] = $validated['email'];
+            if (isset($validated['password'])) $userFields['password'] = Hash::make($validated['password']);
+
+            if (!empty($userFields)) {
+                $doctor->user->update($userFields);
+            }
+
+            $doctorFields = [];
+            if (isset($validated['specialization'])) $doctorFields['specialization'] = $validated['specialization'];
+            if (isset($validated['phone'])) $doctorFields['phone'] = $validated['phone'];
+
+            if (!empty($doctorFields)) {
+                $doctor->update($doctorFields);
+            }
+
+            DB::commit();
+
+            return $this->sendResponse(
+                new DoctorResource($doctor->refresh()),
+                'Data dokter berhasil diperbarui'
+            );
+        } catch (Exception $e) {
+            DB::rollBack();
+            throw $e;
         }
+    }
 
-        $doctor->delete();
+    public function destroy(string|int $id): JsonResponse
+    {
+        $doctor = Doctor::findOrFail($id);
+        
+        DB::beginTransaction();
+        try {
+            $doctor->delete();
+            $doctor->user?->delete();
+            
+            DB::commit();
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Data dokter berhasil dihapus'
-        ], 200);
+            return $this->sendResponse(
+                null,
+                'Data dokter berhasil dihapus'
+            );
+        } catch (Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
     }
 }

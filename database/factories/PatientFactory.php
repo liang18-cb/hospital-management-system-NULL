@@ -2,8 +2,9 @@
 
 namespace Database\Factories;
 
-use Illuminate\Database\Eloquent\Factories\Factory;
 use App\Models\Patient;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Factories\Factory;
 
 class PatientFactory extends Factory
 {
@@ -12,10 +13,10 @@ class PatientFactory extends Factory
     public function definition(): array
     {
         return [
-            'user_id' => \App\Models\User::factory(),
-            'date_of_birth' => $this->faker->date(),
-            'address' => $this->faker->address(),
-            'phone' => $this->faker->phoneNumber(),
+            'user_id' => User::factory()->patient(),
+            'date_of_birth' => fake()->date('Y-m-d', '2010-01-01'),
+            'address' => fake()->address(),
+            'phone' => fake()->phoneNumber(),
         ];
     }
 }

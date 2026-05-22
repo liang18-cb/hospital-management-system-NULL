@@ -2,71 +2,57 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Appointment;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Routing\Controller as BaseController;
+use Illuminate\Http\JsonResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
-class ReportController extends BaseController
+class ReportController extends Controller
 {
-    public function indexAppointments()
+    public function export(Request $request): JsonResponse|StreamedResponse
     {
-        $appointments = DB::table('appointments')
-            ->join('patients', 'appointments.patient_id', '=', 'patients.id')
-            ->join('users as patient_users', 'patients.user_id', '=', 'patient_users.id')
-            ->join('doctors', 'appointments.doctor_id', '=', 'doctors.id')
-            ->join('users as doctor_users', 'doctors.user_id', '=', 'doctor_users.id')
-            ->select(
-                'appointments.id as appointment_id',
-                'appointments.appointment_date',
-                'appointments.status',
-                'appointments.complaint',
-                'patient_users.name as patient_name',
-                'doctor_users.name as doctor_name',
-                'doctors.specialization'
-            )
-            ->get();
+        $type = $request->query('type', 'csv');
+        $report = $request->query('report', 'appointments');
 
-        return response()->json($appointments);
+        if ($type === 'csv') {
+            return $this->streamCsv($report);
+        }
+
+        return $this->sendResponse(
+            ['supported_formats' => ['csv']], 
+            'Format laporan tidak valid', 
+            400
+        );
     }
 
-    public function indexDoctorSchedules()
+    private function streamCsv(string $report): StreamedResponse
     {
-        $doctorSchedules = DB::table('doctors')
-            ->join('users', 'doctors.user_id', '=', 'users.id')
-            ->leftJoin('schedules', 'doctors.id', '=', 'schedules.doctor_id')
-            ->select(
-                'users.name as doctor_name',
-                'doctors.specialization',
-                'schedules.day_of_week',
-                'schedules.start_time',
-                'schedules.end_time'
-            )
-            ->get();
+        $filename = "laporan_{$report}_" . date('Y-m-d') . '.csv';
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ];
 
-        return response()->json($doctorSchedules);
-    }
+        return response()->stream(function () use ($report) {
+            $file = fopen('php://output', 'w');
 
-    public function indexMedicalRecordsReport()
-    {
-        $medicalRecordsReport = DB::table('medical_records')
-            ->join('appointments', 'medical_records.appointment_id', '=', 'appointments.id')
-            ->join('patients', 'appointments.patient_id', '=', 'patients.id')
-            ->join('users as patient_users', 'patients.user_id', '=', 'patient_users.id')
-            ->join('doctors', 'medical_records.doctor_id', '=', 'doctors.id')
-            ->join('users as doctor_users', 'doctors.user_id', '=', 'doctor_users.id')
-            ->select(
-                'medical_records.id as record_id',
-                'medical_records.diagnosis',
-                'medical_records.prescription',
-                'medical_records.created_at as treatment_date',
-                'patient_users.name as patient_name',
-                'patients.date_of_birth',
-                'doctor_users.name as doctor_name',
-                'doctors.specialization'
-            )
-            ->orderBy('medical_records.created_at', 'desc')
-            ->get();
+            if ($report === 'appointments') {
+                fputcsv($file, ['ID', 'Nama Pasien', 'Nama Dokter', 'Tanggal', 'Status', 'Keluhan']);
+                Appointment::with(['patient.user', 'doctor.user'])->chunk(100, function ($appointments) use ($file) {
+                    foreach ($appointments as $app) {
+                        fputcsv($file, [
+                            $app->id,
+                            $app->patient->user->name ?? '-',
+                            $app->doctor->user->name ?? '-',
+                            $app->appointment_date,
+                            $app->status,
+                            $app->complaint,
+                        ]);
+                    }
+                });
+            }
 
-        return response()->json($medicalRecordsReport);
+            fclose($file);
+        }, 200, $headers);
     }
 }

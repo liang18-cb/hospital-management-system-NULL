@@ -2,99 +2,138 @@
 
 namespace App\Http\Controllers\API;
 
-use App\Models\File;
 use App\Http\Controllers\Controller;
+use App\Models\File;
+use App\Http\Requests\UploadFileRequest;
+use App\Http\Requests\UpdateFileRequest;
+use App\Http\Resources\API\FileResource;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpFoundation\Response;
+use Exception;
 
 class FileController extends Controller
 {
-    public function index()
+    public function index(): JsonResponse
     {
-        $files = File::all();
+        $files = File::paginate(10);
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Data file berhasil diambil',
-            'data' => $files
-        ], 200);
+        return $this->sendResponse(
+            FileResource::collection($files),
+            'Data file berhasil diambil'
+        );
     }
 
-    public function store(Request $request)
+    public function store(UploadFileRequest $request): JsonResponse
     {
-        $request->validate([
-            'fileable_type' => 'required|string',
-            'fileable_id' => 'required|integer',
-            'document' => 'required|file|max:2048'
-        ]);
+        $validated = $request->validated();
 
-        if ($request->hasFile('document')) {
-            $uploadedFile = $request->file('document');
-            $originalName = $uploadedFile->getClientOriginalName();
-            $mimeType = $uploadedFile->getClientMimeType();
-            $size = $uploadedFile->getSize();
-            
-            $filePath = $uploadedFile->store('uploads', 'public');
+        DB::beginTransaction();
+        try {
+            $uploadedFile = $request->file('file');
+            $filePath = Storage::disk('medical')->putFile('', $uploadedFile);
 
             $file = File::create([
-                'fileable_type' => $request->fileable_type,
-                'fileable_id' => $request->fileable_id,
+                'fileable_type' => $validated['fileable_type'],
+                'fileable_id' => $validated['fileable_id'],
                 'file_path' => $filePath,
-                'original_name' => $originalName,
-                'mime_type' => $mimeType,
-                'size' => $size,
-                'uploaded_by' => Auth::user() ? Auth::user()->id : null
+                'file_name' => $uploadedFile->getClientOriginalName(),
+                'file_type' => $uploadedFile->getClientMimeType(),
+                'uploaded_by' => $request->user()?->id
             ]);
 
+            DB::commit();
+
+            return $this->sendResponse(
+                new FileResource($file),
+                'File berhasil diunggah secara aman di penyimpanan privat.',
+                201
+            );
+        } catch (Exception $e) {
+            DB::rollBack();
+            if (isset($filePath) && Storage::disk('medical')->exists($filePath)) {
+                Storage::disk('medical')->delete($filePath);
+            }
+            throw $e;
+        }
+    }
+
+    public function show(Request $request, string|int $id): Response
+    {
+        $file = File::findOrFail($id);
+        $user = $request->user();
+
+        $isAuthorized = false;
+
+        if ($user->role === 'admin') {
+            $isAuthorized = true;
+        } elseif ($user->role === 'doctor') {
+            if ($file->fileable_type === 'App\Models\Doctor' && $file->fileable_id == $user->id) {
+                $isAuthorized = true;
+            } elseif ($file->fileable_type === 'App\Models\MedicalRecord' || $file->uploaded_by == $user->id) {
+                $isAuthorized = true;
+            }
+        } elseif ($user->role === 'patient') {
+            if ($file->fileable_type === 'App\Models\Patient' && $file->fileable_id == $user->id) {
+                $isAuthorized = true;
+            } elseif ($file->fileable_type === 'App\Models\MedicalRecord' && $file->fileable?->patient_id == $user->id) {
+                $isAuthorized = true;
+            }
+        }
+
+        if (!$isAuthorized) {
             return response()->json([
-                'status' => 'success',
-                'message' => 'File berhasil diunggah',
-                'data' => $file
-            ], 201);
+                'status' => 'error',
+                'message' => 'Anda tidak memiliki hak akses untuk mengunduh dokumen ini.',
+            ], 403);
         }
 
-        return response()->json([
-            'status' => 'error',
-            'message' => 'Gagal mengunggah file'
-        ], 400);
-    }
+        $absolutePath = Storage::disk('medical')->path($file->file_path);
 
-    public function show(File $file)
-    {
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Detail info file berhasil ditemukan',
-            'data' => $file
-        ], 200);
-    }
-
-    public function update(Request $request, File $file)
-    {
-        $request->validate([
-            'original_name' => 'sometimes|string'
-        ]);
-
-        $file->update($request->only('original_name'));
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Nama file berhasil diperbarui',
-            'data' => $file
-        ], 200);
-    }
-
-    public function destroy(File $file)
-    {
-        if (Storage::disk('public')->exists($file->file_path)) {
-            Storage::disk('public')->delete($file->file_path);
+        if (!file_exists($absolutePath)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Fisik file tidak ditemukan di server.',
+            ], 404);
         }
 
-        $file->delete();
+        return response()->download($absolutePath, $file->file_name);
+    }
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Data file berhasil dihapus'
-        ], 200);
+    public function update(UpdateFileRequest $request, string|int $id): JsonResponse
+    {
+        $file = File::findOrFail($id);
+        $file->update($request->validated());
+
+        return $this->sendResponse(
+            new FileResource($file->refresh()),
+            'Nama file berhasil diperbarui'
+        );
+    }
+
+    public function destroy(Request $request, string|int $id): JsonResponse
+    {
+        $file = File::findOrFail($id);
+        $user = $request->user();
+
+        if ($user->role !== 'admin' && $file->uploaded_by !== $user->id) {
+            return $this->sendResponse(null, 'Anda tidak memiliki izin untuk menghapus file ini', 403);
+        }
+
+        DB::beginTransaction();
+        try {
+            $file->delete();
+            DB::commit();
+
+            return $this->sendResponse(
+                null,
+                'Data file berhasil ditandai sebagai dihapus (soft delete).'
+            );
+        } catch (Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
     }
 }

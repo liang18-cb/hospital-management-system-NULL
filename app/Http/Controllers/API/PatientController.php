@@ -5,94 +5,126 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\Controller;
 use App\Models\Patient;
 use App\Models\User;
+use App\Http\Requests\StorePatientRequest;
+use App\Http\Requests\UpdatePatientRequest;
 use App\Http\Resources\API\PatientResource;
-use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
+use Exception;
 
 class PatientController extends Controller
 {
-    // GET all patients
-    public function index()
+    public function index(): JsonResponse
     {
-        $patients = Patient::with('user')->get();
+        $patients = Patient::with('user')->paginate(10);
 
-        return PatientResource::collection($patients);
+        return $this->sendResponse(
+            PatientResource::collection($patients),
+            'Data pasien berhasil diambil'
+        );
     }
 
-    // POST create patient
-    public function store(Request $request)
+    public function store(StorePatientRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'name'          => 'required|string|max:255',
-            'email'         => 'required|email|unique:users,email',
-            'password'      => 'required|string|min:8',
-            'date_of_birth' => 'required|date',
-            'address'       => 'required|string',
-            'phone'         => 'required|string',
-        ]);
+        $validated = $request->validated();
 
-        // Create user
-        $user = User::create([
-            'name'     => $validated['name'],
-            'email'    => $validated['email'],
-            'password' => Hash::make($validated['password']),
-            'role'     => 'patient',
-        ]);
+        DB::beginTransaction();
+        try {
+            $user = User::create([
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'password' => Hash::make($validated['password']),
+                'role' => 'patient',
+            ]);
 
-        // Create patient
-        $patient = Patient::create([
-            'user_id'       => $user->id,
-            'date_of_birth' => $validated['date_of_birth'],
-            'address'       => $validated['address'],
-            'phone'         => $validated['phone'],
-        ]);
+            $patient = Patient::create([
+                'user_id' => $user->id,
+                'date_of_birth' => $validated['date_of_birth'],
+                'address' => $validated['address'],
+                'phone' => $validated['phone'],
+            ]);
 
-        return response()->json([
-            'message' => 'Patient created successfully',
-            'data'    => new PatientResource($patient)
-        ], 201);
+            DB::commit();
+
+            return $this->sendResponse(
+                new PatientResource($patient->load('user')),
+                'Data pasien berhasil ditambahkan',
+                201
+            );
+        } catch (Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
     }
 
-    // GET patient by ID
-    public function show($id)
+    public function show(string|int $id): JsonResponse
     {
         $patient = Patient::with('user')->findOrFail($id);
 
-        return new PatientResource($patient);
+        return $this->sendResponse(
+            new PatientResource($patient),
+            'Detail pasien berhasil ditemukan'
+        );
     }
 
-    // UPDATE patient
-    public function update(Request $request, $id)
+    public function update(UpdatePatientRequest $request, string|int $id): JsonResponse
     {
-        $patient = Patient::findOrFail($id);
+        $patient = Patient::with('user')->findOrFail($id);
+        $validated = $request->validated();
 
-        $validated = $request->validate([
-            'date_of_birth' => 'sometimes|date',
-            'address'       => 'sometimes|string',
-            'phone'         => 'sometimes|string',
-        ]);
+        DB::beginTransaction();
+        try {
+            $userFields = [];
+            if (isset($validated['name'])) $userFields['name'] = $validated['name'];
+            if (isset($validated['email'])) $userFields['email'] = $validated['email'];
+            if (isset($validated['password'])) $userFields['password'] = Hash::make($validated['password']);
 
-        $patient->update($validated);
+            if (!empty($userFields) && $patient->user) {
+                $patient->user->update($userFields);
+            }
 
-        return response()->json([
-            'message' => 'Patient updated successfully',
-            'data'    => new PatientResource($patient)
-        ]);
-    }
+            $patientFields = [];
+            if (isset($validated['date_of_birth'])) $patientFields['date_of_birth'] = $validated['date_of_birth'];
+            if (isset($validated['address'])) $patientFields['address'] = $validated['address'];
+            if (isset($validated['phone'])) $patientFields['phone'] = $validated['phone'];
 
-    // DELETE patient
-    public function destroy($id)
-    {
-        $patient = Patient::findOrFail($id);
+            if (!empty($patientFields)) {
+                $patient->update($patientFields);
+            }
 
-        if ($patient->user) {
-            $patient->user->delete();
+            DB::commit();
+
+            return $this->sendResponse(
+                new PatientResource($patient->refresh()),
+                'Data pasien berhasil diperbarui'
+            );
+        } catch (Exception $e) {
+            DB::rollBack();
+            throw $e;
         }
+    }
 
-        $patient->delete();
+    public function destroy(string|int $id): JsonResponse
+    {
+        $patient = Patient::findOrFail($id);
 
-        return response()->json([
-            'message' => 'Patient deleted successfully'
-        ]);
+        DB::beginTransaction();
+        try {
+            if ($patient->user) {
+                $patient->user->delete();
+            }
+            $patient->delete();
+
+            DB::commit();
+
+            return $this->sendResponse(
+                null,
+                'Data pasien berhasil dihapus'
+            );
+        } catch (Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
     }
 }

@@ -7,20 +7,17 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class PatientResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     */
     public function toArray(Request $request): array
     {
         return [
             'id' => $this->id,
-            'name' => $this->user->name,
-            'email' => $this->user->email,
+            'name' => $this->user?->name,
+            'email' => $this->user?->email,
             'phone' => $this->phone,
             'address' => $this->address,
             'date_of_birth' => $this->date_of_birth,
-            'role' => $this->user->role,
-            'created_at' => $this->created_at->format('Y-m-d H:i:s'),
+            'role' => $this->user?->role,
+            'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
         ];
     }
 }

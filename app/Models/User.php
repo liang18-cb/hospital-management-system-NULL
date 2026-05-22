@@ -7,6 +7,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -47,27 +50,27 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->role === 'patient';
     }
 
-    public function doctor()
+    public function doctor(): HasOne
     {
         return $this->hasOne(Doctor::class);
     }
 
-    public function patient()
+    public function patient(): HasOne
     {
         return $this->hasOne(Patient::class);
     }
 
-    public function notifications()
+    public function notifications(): HasMany
     {
         return $this->hasMany(Notification::class);
     }
 
-    public function appointmentsAsDoctor()
+    public function appointmentsAsDoctor(): HasManyThrough
     {
         return $this->hasManyThrough(Appointment::class, Doctor::class, 'user_id', 'doctor_id');
     }
 
-    public function appointmentsAsPatient()
+    public function appointmentsAsPatient(): HasManyThrough
     {
         return $this->hasManyThrough(Appointment::class, Patient::class, 'user_id', 'patient_id');
     }

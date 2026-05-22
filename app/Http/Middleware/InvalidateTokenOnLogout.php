@@ -13,12 +13,20 @@ class InvalidateTokenOnLogout
         if ($request->user()) {
             $request->user()->currentAccessToken()->delete();
             return response()->json([
-                'message' => 'Successfully logged out. Token invalidated.'
+                'status' => 'success',
+                'message' => 'Sesi berhasil diakhiri, token telah dihapus.',
+                'data' => null,
+                'meta' => null,
+                'errors' => null
             ]);
         }
 
         return response()->json([
-            'message' => 'No active session found.'
+            'status' => 'error',
+            'message' => 'Sesi aktif tidak ditemukan.',
+            'data' => null,
+            'meta' => null,
+            'errors' => null
         ], 401);
     }
 }

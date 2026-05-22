@@ -12,7 +12,11 @@ class RoleMiddleware
     {
         if (!$request->user() || !in_array($request->user()->role, $roles)) {
             return response()->json([
-                'message' => 'Unauthorized access.'
+                'status' => 'error',
+                'message' => 'Anda tidak memiliki hak akses untuk aksi ini.',
+                'data' => null,
+                'meta' => null,
+                'errors' => null
             ], 403);
         }
 

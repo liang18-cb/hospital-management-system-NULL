@@ -6,10 +6,11 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Http\JsonResponse;
 
 class AuthController extends Controller
 {
-    public function register(Request $request)
+    public function register(Request $request): JsonResponse
     {
         $request->validate([
             'name' => 'required|string|max:255',
@@ -27,15 +28,19 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
-        return response()->json([
-            'message' => 'User successfully registered.',
+        return $this->sendResponse([
             'access_token' => $token,
             'token_type' => 'Bearer',
-            'user' => $user
-        ], 201);
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role
+            ]
+        ], 'User successfully registered.', 201);
     }
 
-    public function login(Request $request)
+    public function login(Request $request): JsonResponse
     {
         $request->validate([
             'email' => 'required|string|email',
@@ -52,8 +57,7 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
-        return response()->json([
-            'message' => 'Login successful.',
+        return $this->sendResponse([
             'access_token' => $token,
             'token_type' => 'Bearer',
             'user' => [
@@ -62,10 +66,13 @@ class AuthController extends Controller
                 'email' => $user->email,
                 'role' => $user->role
             ]
-        ]);
+        ], 'Login successful.');
     }
 
-    public function logout()
+    public function logout(Request $request): JsonResponse
     {
+        $request->user()?->currentAccessToken()?->delete();
+
+        return $this->sendResponse(null, 'Logout successful.');
     }
 }

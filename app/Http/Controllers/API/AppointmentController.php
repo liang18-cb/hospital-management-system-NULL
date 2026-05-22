@@ -4,97 +4,89 @@ namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
 use App\Models\Appointment;
+use App\Http\Requests\StoreAppointmentRequest;
+use App\Http\Requests\UpdateAppointmentRequest;
+use App\Http\Resources\API\AppointmentResource;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 class AppointmentController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse
     {
         $user = $request->user();
-        $query = Appointment::query();
+        $query = Appointment::with(['doctor.user', 'patient.user', 'schedule']);
 
-        if ($user->isDoctor()) {
+        if ($user?->role === 'doctor' && $user->doctor) {
             $query->where('doctor_id', $user->doctor->id);
-        } elseif ($user->isPatient()) {
+        } elseif ($user?->role === 'patient' && $user->patient) {
             $query->where('patient_id', $user->patient->id);
         }
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Data janji temu berhasil diambil',
-            'data' => $query->get()
-        ], 200);
+        $appointments = $query->paginate(10);
+
+        return $this->sendResponse(
+            AppointmentResource::collection($appointments),
+            'Data janji temu berhasil diambil'
+        );
     }
 
-    public function store(Request $request)
+    public function store(StoreAppointmentRequest $request): JsonResponse
     {
         $user = $request->user();
+        $validated = $request->validated();
 
-        $validated = $request->validate([
-            'doctor_id' => 'required|integer|exists:doctors,id',
-            'schedule_id' => 'required|integer|exists:schedules,id',
-            'appointment_date' => 'required|date',
-            'complaint' => 'nullable|string',
-        ]);
-
-        $validated['patient_id'] = $user->patient->id;
+        $validated['patient_id'] = $user?->patient?->id;
         $validated['status'] = 'pending';
 
         $appointment = Appointment::create($validated);
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Janji temu berhasil dibuat',
-            'data' => $appointment
-        ], 201);
+        return $this->sendResponse(
+            new AppointmentResource($appointment->load(['doctor.user', 'patient.user', 'schedule'])),
+            'Janji temu berhasil dibuat',
+            201
+        );
     }
 
-    public function show(Request $request, Appointment $appointment)
+    public function show(Request $request, string|int $id): JsonResponse
     {
         $user = $request->user();
+        $appointment = Appointment::with(['doctor.user', 'patient.user', 'schedule'])->findOrFail($id);
 
-        if ($user->isDoctor() && $appointment->doctor_id !== $user->doctor->id) {
-            return response()->json(['message' => 'Unauthorized access.'], 403);
+        if ($user?->role === 'doctor' && $appointment->doctor_id !== $user->doctor?->id) {
+            throw new AccessDeniedHttpException('Unauthorized access.');
         }
 
-        if ($user->isPatient() && $appointment->patient_id !== $user->patient->id) {
-            return response()->json(['message' => 'Unauthorized access.'], 403);
+        if ($user?->role === 'patient' && $appointment->patient_id !== $user->patient?->id) {
+            throw new AccessDeniedHttpException('Unauthorized access.');
         }
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Detail janji temu berhasil ditemukan',
-            'data' => $appointment
-        ], 200);
+        return $this->sendResponse(
+            new AppointmentResource($appointment),
+            'Detail janji temu berhasil ditemukan'
+        );
     }
 
-    public function update(Request $request, Appointment $appointment)
+    public function update(UpdateAppointmentRequest $request, string|int $id): JsonResponse
     {
-        $validated = $request->validate([
-            'patient_id' => 'sometimes|integer|exists:patients,id',
-            'doctor_id' => 'sometimes|integer|exists:doctors,id',
-            'schedule_id' => 'sometimes|integer|exists:schedules,id',
-            'appointment_date' => 'sometimes|date',
-            'status' => 'sometimes|in:pending,confirmed,completed,cancelled',
-            'complaint' => 'nullable|string',
-        ]);
+        $appointment = Appointment::findOrFail($id);
+        $appointment->update($request->validated());
 
-        $appointment->update($validated);
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Data janji temu berhasil diperbarui',
-            'data' => $appointment
-        ], 200);
+        return $this->sendResponse(
+            new AppointmentResource($appointment->load(['doctor.user', 'patient.user', 'schedule'])->refresh()),
+            'Data janji temu berhasil diperbarui'
+        );
     }
 
-    public function destroy(Appointment $appointment)
+    public function destroy(string|int $id): JsonResponse
     {
+        $appointment = Appointment::findOrFail($id);
         $appointment->delete();
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Data janji temu berhasil dihapus'
-        ], 200);
+        return $this->sendResponse(
+            null,
+            'Data janji temu berhasil dihapus'
+        );
     }
 }

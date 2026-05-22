@@ -10,16 +10,13 @@ return new class extends Migration
     {
         Schema::create('files', function (Blueprint $table) {
             $table->id();
-            $table->string('fileable_type');
-            $table->unsignedBigInteger('fileable_id');
+            $table->morphs('fileable'); 
             $table->string('file_path');
-            $table->string('original_name');
-            $table->string('mime_type');
-            $table->unsignedBigInteger('size');
+            $table->string('file_name');
+            $table->string('file_type');
             $table->foreignId('uploaded_by')->constrained('users')->onDelete('cascade');
+            $table->softDeletes();
             $table->timestamps();
-
-            $table->index(['fileable_type', 'fileable_id']);
         });
     }
 

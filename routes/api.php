@@ -1,7 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\AuthController;
+use App\Http\Controllers\API\AuthController;
 use App\Http\Controllers\API\PatientController;
 use App\Http\Controllers\API\DoctorController;
 use App\Http\Controllers\API\AppointmentController;
@@ -20,7 +20,6 @@ Route::prefix('v1')->group(function () {
             Route::get('/patients', [PatientController::class, 'index']);
             Route::get('/reports/export', [ReportController::class, 'export']);
             Route::apiResource('doctors', DoctorController::class);
-            Route::apiResource('files', FileController::class)->only(['destroy']);
         });
 
         Route::middleware('role:admin,patient')->group(function () {
@@ -39,6 +38,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/medical-records/{id}', [MedicalRecordController::class, 'show']);
             Route::get('/files/{id}', [FileController::class, 'show']);
             Route::post('/files/upload', [FileController::class, 'store']);
+            Route::put('/files/{id}', [FileController::class, 'update']);
         });
 
         Route::middleware('role:admin,doctor')->group(function () {

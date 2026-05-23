@@ -21,6 +21,11 @@ class File extends Model
         'uploaded_by'
     ];
 
+    protected $casts = [
+    'uploaded_by' => 'integer',
+    'fileable_id' => 'integer',
+];
+
     public function fileable(): MorphTo
     {
         return $this->morphTo();

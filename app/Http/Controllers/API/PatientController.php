@@ -19,8 +19,18 @@ class PatientController extends Controller
     {
         $patients = Patient::with('user')->paginate(10);
 
+        $data = [
+            'items' => PatientResource::collection($patients),
+            'pagination' => [
+                'current_page' => $patients->currentPage(),
+                'last_page' => $patients->lastPage(),
+                'per_page' => $patients->perPage(),
+                'total' => $patients->total(),
+            ]
+        ];
+
         return $this->sendResponse(
-            PatientResource::collection($patients),
+            $data,
             'Data pasien berhasil diambil'
         );
     }
@@ -113,8 +123,9 @@ class PatientController extends Controller
         try {
             if ($patient->user) {
                 $patient->user->delete();
+            } else {
+                $patient->delete();
             }
-            $patient->delete();
 
             DB::commit();
 

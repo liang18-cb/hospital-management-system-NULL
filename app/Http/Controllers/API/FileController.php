@@ -12,18 +12,61 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Exception;
 
 class FileController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $files = File::paginate(10);
+        $user = $request->user();
+        $query = File::query();
 
-        return $this->sendResponse(
-            FileResource::collection($files),
-            'Data file berhasil diambil'
-        );
+        if ($user?->role === 'doctor' && $user->doctor) {
+            $doctorId = $user->doctor->id;
+            $query->where('uploaded_by', $user->id)
+                  ->orWhere(function ($q) use ($doctorId) {
+                      $q->where('fileable_type', 'App\Models\Doctor')
+                        ->where('fileable_id', $doctorId);
+                  })
+                  ->orWhere(function ($q) use ($doctorId) {
+                      $q->where('fileable_type', 'App\Models\MedicalRecord')
+                        ->whereHasMorph('fileable', ['App\Models\MedicalRecord'], function ($sub) use ($doctorId) {
+                            $sub->where('doctor_id', $doctorId);
+                        });
+                  });
+        } elseif ($user?->role === 'patient' && $user->patient) {
+            $patientId = $user->patient->id;
+            $query->where('uploaded_by', $user->id)
+                  ->orWhere(function ($q) use ($patientId) {
+                      $q->where('fileable_type', 'App\Models\Patient')
+                        ->where('fileable_id', $patientId);
+                  })
+                  ->orWhere(function ($q) use ($patientId) {
+                      $q->where('fileable_type', 'App\Models\MedicalRecord')
+                        ->whereHasMorph('fileable', ['App\Models\MedicalRecord'], function ($sub) use ($patientId) {
+                            $sub->whereHas('appointment', function ($ap) use ($patientId) {
+                                $ap->where('patient_id', $patientId);
+                            });
+                        });
+                  });
+        } elseif ($user?->role !== 'admin') {
+            $query->where('id', 0);
+        }
+
+        $files = $query->paginate(10);
+
+        $data = [
+            'items' => FileResource::collection($files),
+            'pagination' => [
+                'current_page' => $files->currentPage(),
+                'last_page' => $files->lastPage(),
+                'per_page' => $files->perPage(),
+                'total' => $files->total(),
+            ]
+        ];
+
+        return $this->sendResponse($data, 'Data file berhasil diambil');
     }
 
     public function store(UploadFileRequest $request): JsonResponse
@@ -64,30 +107,32 @@ class FileController extends Controller
     {
         $file = File::findOrFail($id);
         $user = $request->user();
-
         $isAuthorized = false;
 
         if ($user->role === 'admin') {
             $isAuthorized = true;
         } elseif ($user->role === 'doctor') {
-            if ($file->fileable_type === 'App\Models\Doctor' && $file->fileable_id == $user->id) {
+            $doctorId = $user->doctor?->id;
+            if ($file->fileable_type === 'App\Models\Doctor' && $file->fileable_id == $doctorId) {
                 $isAuthorized = true;
-            } elseif ($file->fileable_type === 'App\Models\MedicalRecord' || $file->uploaded_by == $user->id) {
+            } elseif ($file->uploaded_by == $user->id) {
+                $isAuthorized = true;
+            } elseif ($file->fileable_type === 'App\Models\MedicalRecord' && $file->fileable?->doctor_id == $doctorId) {
                 $isAuthorized = true;
             }
         } elseif ($user->role === 'patient') {
-            if ($file->fileable_type === 'App\Models\Patient' && $file->fileable_id == $user->id) {
+            $patientId = $user->patient?->id;
+            if ($file->fileable_type === 'App\Models\Patient' && $file->fileable_id == $patientId) {
                 $isAuthorized = true;
-            } elseif ($file->fileable_type === 'App\Models\MedicalRecord' && $file->fileable?->patient_id == $user->id) {
+            } elseif ($file->uploaded_by == $user->id) {
+                $isAuthorized = true;
+            } elseif ($file->fileable_type === 'App\Models\MedicalRecord' && $file->fileable?->appointment?->patient_id == $patientId) {
                 $isAuthorized = true;
             }
         }
 
         if (!$isAuthorized) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Anda tidak memiliki hak akses untuk mengunduh dokumen ini.',
-            ], 403);
+            throw new AccessDeniedHttpException('Anda tidak memiliki hak akses untuk mengunduh dokumen ini.');
         }
 
         $absolutePath = Storage::disk('medical')->path($file->file_path);
@@ -105,12 +150,21 @@ class FileController extends Controller
     public function update(UpdateFileRequest $request, string|int $id): JsonResponse
     {
         $file = File::findOrFail($id);
-        $file->update($request->validated());
+        $validated = $request->validated();
 
-        return $this->sendResponse(
-            new FileResource($file->refresh()),
-            'Nama file berhasil diperbarui'
-        );
+        DB::beginTransaction();
+        try {
+            $file->update($validated);
+            DB::commit();
+
+            return $this->sendResponse(
+                new FileResource($file->refresh()),
+                'Nama file berhasil diperbarui'
+            );
+        } catch (Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
     }
 
     public function destroy(Request $request, string|int $id): JsonResponse
@@ -119,7 +173,7 @@ class FileController extends Controller
         $user = $request->user();
 
         if ($user->role !== 'admin' && $file->uploaded_by !== $user->id) {
-            return $this->sendResponse(null, 'Anda tidak memiliki izin untuk menghapus file ini', 403);
+            throw new AccessDeniedHttpException('Anda tidak memiliki izin untuk menghapus file ini');
         }
 
         DB::beginTransaction();

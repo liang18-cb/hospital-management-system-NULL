@@ -8,7 +8,8 @@ class StoreMedicalRecordRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->role === 'doctor';
+        $user = $this->user();
+        return $user && ($user->role === 'doctor' || $user->role === 'admin');
     }
 
     public function rules(): array
@@ -16,7 +17,7 @@ class StoreMedicalRecordRequest extends FormRequest
         return [
             'appointment_id' => 'required|exists:appointments,id',
             'diagnosis' => 'required|string',
-            'treatment' => 'required|string',
+            'prescription' => 'required|string',
             'notes' => 'nullable|string',
         ];
     }

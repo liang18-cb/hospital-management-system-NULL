@@ -29,7 +29,7 @@ class UploadFileRequest extends FormRequest
     {
         return [
             'file' => 'required|file|mimes:jpg,jpeg,png,pdf,docx|max:5120',
-            'fileable_type' => 'required|string',
+            'fileable_type' => 'required|string|in:App\Models\Doctor,App\Models\Patient,App\Models\MedicalRecord',
             'fileable_id' => 'required|integer',
         ];
     }

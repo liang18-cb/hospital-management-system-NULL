@@ -13,9 +13,10 @@ class AppointmentResource extends JsonResource
             'id' => $this->id,
             'appointment_date' => $this->appointment_date,
             'status' => $this->status,
-            'notes' => $this->notes,
+            'complaint' => $this->complaint,
             'doctor' => new DoctorResource($this->whenLoaded('doctor') ?? $this->doctor),
             'patient' => new PatientResource($this->whenLoaded('patient') ?? $this->patient),
+            'schedule' => new ScheduleResource($this->whenLoaded('schedule') ?? $this->schedule),
             'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
         ];
     }

@@ -12,10 +12,14 @@ class MedicalRecordFactory extends Factory
 
     public function definition(): array
     {
+        $appointment = Appointment::where('status', 'completed')->inRandomOrder()->first() ?? Appointment::factory(['status' => 'completed']);
+
         return [
-            'appointment_id' => Appointment::factory(),
+            'appointment_id' => $appointment->id,
+            'doctor_id' => $appointment->doctor_id,
             'diagnosis' => fake()->sentence(),
-            'treatment' => fake()->paragraph(),
+            'prescription' => fake()->paragraph(),
+            'notes' => fake()->optional()->sentence(),
         ];
     }
 }

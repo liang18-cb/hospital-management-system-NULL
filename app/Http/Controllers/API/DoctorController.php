@@ -86,6 +86,7 @@ class DoctorController extends Controller
             $doctorFields = [];
             if (isset($validated['specialization'])) $doctorFields['specialization'] = $validated['specialization'];
             if (isset($validated['phone'])) $doctorFields['phone'] = $validated['phone'];
+            if (isset($validated['photo'])) $doctorFields['photo'] = $validated['photo'];
 
             if (!empty($doctorFields)) {
                 $doctor->update($doctorFields);
@@ -105,12 +106,15 @@ class DoctorController extends Controller
 
     public function destroy(string|int $id): JsonResponse
     {
-        $doctor = Doctor::findOrFail($id);
+        $doctor = Doctor::with('user')->findOrFail($id);
         
         DB::beginTransaction();
         try {
-            $doctor->delete();
-            $doctor->user?->delete();
+            if ($doctor->user) {
+                $doctor->user->delete();
+            } else {
+                $doctor->delete();
+            }
             
             DB::commit();
 

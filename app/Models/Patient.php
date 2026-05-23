@@ -18,6 +18,7 @@ class Patient extends Model
         'date_of_birth',
         'address',
         'phone',
+        'photo',
     ];
 
     public function user(): BelongsTo

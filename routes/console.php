@@ -14,3 +14,5 @@ Schedule::call(function () {
         DB::table('files')->where('id', $file->id)->delete();
     }
 })->daily();
+
+Schedule::command('appointment:send-reminder')->dailyAt('07:00');

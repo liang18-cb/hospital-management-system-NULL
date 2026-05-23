@@ -10,7 +10,23 @@ class UpdatePatientRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->role === 'admin' || $this->user()?->role === 'patient';
+        $user = $this->user();
+        if (!$user) {
+            return false;
+        }
+
+        if ($user->role === 'admin') {
+            return true;
+        }
+
+        if ($user->role === 'patient') {
+            $patientId = $this->route('patient');
+            $patient = Patient::find($patientId);
+            
+            return $patient && $user->id === $patient->user_id;
+        }
+
+        return false;
     }
 
     public function rules(): array

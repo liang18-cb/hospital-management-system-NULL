@@ -74,12 +74,13 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $exceptions->render(function (Throwable $e, Request $request) {
             if ($request->is('api/*')) {
+                $isDebug = config('app.debug', false);
                 return response()->json([
                     'status' => 'error',
-                    'message' => $e->getMessage() ?: 'Terjadi kesalahan pada server.',
+                    'message' => $isDebug ? $e->getMessage() : 'Terjadi kesalahan internal pada server.',
                     'data' => null,
                     'meta' => null,
-                    'errors' => null
+                    'errors' => $isDebug ? $e->getTrace() : null
                 ], 500);
             }
         });

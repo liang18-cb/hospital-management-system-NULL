@@ -31,8 +31,18 @@ class MedicalRecordController extends Controller
 
         $medicalRecords = $query->paginate(10);
 
+        $data = [
+            'items' => MedicalRecordResource::collection($medicalRecords),
+            'pagination' => [
+                'current_page' => $medicalRecords->currentPage(),
+                'last_page' => $medicalRecords->lastPage(),
+                'per_page' => $medicalRecords->perPage(),
+                'total' => $medicalRecords->total(),
+            ]
+        ];
+
         return $this->sendResponse(
-            MedicalRecordResource::collection($medicalRecords),
+            $data,
             'Data rekam medis berhasil diambil'
         );
     }
@@ -44,11 +54,11 @@ class MedicalRecordController extends Controller
 
         $appointment = Appointment::findOrFail($validated['appointment_id']);
 
-        if ($appointment->doctor_id !== $user->doctor?->id) {
+        if ($user->role === 'doctor' && $appointment->doctor_id !== $user->doctor?->id) {
             throw new AccessDeniedHttpException('Unauthorized access.');
         }
 
-        $validated['doctor_id'] = $user->doctor->id;
+        $validated['doctor_id'] = $appointment->doctor_id;
 
         DB::beginTransaction();
         try {
@@ -91,10 +101,11 @@ class MedicalRecordController extends Controller
     public function update(UpdateMedicalRecordRequest $request, string|int $id): JsonResponse
     {
         $medicalRecord = MedicalRecord::findOrFail($id);
-        
+        $validated = $request->validated();
+
         DB::beginTransaction();
         try {
-            $medicalRecord->update($request->validated());
+            $medicalRecord->update($validated);
             DB::commit();
 
             return $this->sendResponse(
@@ -107,9 +118,14 @@ class MedicalRecordController extends Controller
         }
     }
 
-    public function destroy(string|int $id): JsonResponse
+    public function destroy(Request $request, string|int $id): JsonResponse
     {
+        $user = $request->user();
         $medicalRecord = MedicalRecord::findOrFail($id);
+
+        if ($user?->role !== 'admin' && ($user?->role === 'doctor' && $medicalRecord->doctor_id !== $user->doctor?->id)) {
+            throw new AccessDeniedHttpException('Unauthorized access.');
+        }
 
         DB::beginTransaction();
         try {

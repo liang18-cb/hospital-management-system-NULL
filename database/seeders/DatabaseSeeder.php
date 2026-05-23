@@ -14,6 +14,8 @@ class DatabaseSeeder extends Seeder
             PatientsSeeder::class,
             SchedulesSeeder::class,
             AppointmentsSeeder::class,
+            MedicalRecordsSeeder::class,
+            FilesSeeder::class,
         ]);
     }
 }

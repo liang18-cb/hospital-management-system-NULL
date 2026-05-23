@@ -10,7 +10,24 @@ class UpdateDoctorRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->role === 'admin' || $this->user()?->role === 'doctor';
+        $user = $this->user();
+        
+        if (!$user) {
+            return false;
+        }
+
+        if ($user->role === 'admin') {
+            return true;
+        }
+
+        if ($user->role === 'doctor') {
+            $doctorId = $this->route('doctor');
+            $doctor = Doctor::find($doctorId);
+            
+            return $doctor && $user->id === $doctor->user_id;
+        }
+
+        return false;
     }
 
     public function rules(): array
@@ -30,6 +47,7 @@ class UpdateDoctorRequest extends FormRequest
             'password' => 'sometimes|required|string|min:8',
             'specialization' => 'sometimes|required|string|max:255',
             'phone' => 'sometimes|required|string|max:20',
+            'photo' => 'sometimes|nullable|string',
         ];
     }
 }
